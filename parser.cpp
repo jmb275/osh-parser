@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Yutaka Tsutano
+ * Copyright (c) 2022, Justin Bradley
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -12,6 +12,11 @@
  * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
  * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
+ *
+ * Updates:
+ * 2022-01-23 Fixes to handle no spaces after semicolons (courtesy of Jaden
+ * Goter)
+ * 
  */
 
 #include <sstream>
@@ -71,7 +76,20 @@ std::vector<shell_command> parse_command_string(const std::string& str)
         need_out_path
     } state = parser_state::need_new_command;
 
-    std::istringstream iss(str);
+	// To handle spaces after semicolons we preprocess the string and add a
+	// space after each semicolon. This allows std::istringstream to easily
+	// tokenize based on spaces. (credit: Jaden Goter)
+    std::string new_str;
+    for (int i = 0; i < (int)str.length() - 1; i++) {
+        new_str += str[i];
+        if (str[i] == ';' && (i+1)<((int)str.length()-1) && str[i + 1] != ' ') {
+            new_str += ' ';
+        }
+    }
+    new_str += str[str.length() - 1];
+	// end new code
+
+	std::istringstream iss(new_str);
     std::string token;
     while (iss >> token) {
         auto token_type = get_shell_token_type(token);
@@ -85,7 +103,7 @@ std::vector<shell_command> parse_command_string(const std::string& str)
 
             case shell_token_type::redirect_cin:
                 if (commands.back().cin_mode == istream_mode::pipe) {
-                    throw parsing_error("ambiguous input redirect");
+                    throw parsing_error("Ambiguous input redirect.");
                 }
                 commands.back().cin_mode = istream_mode::file;
                 state = parser_state::need_in_path;
@@ -103,7 +121,7 @@ std::vector<shell_command> parse_command_string(const std::string& str)
 
             case shell_token_type::pipe:
                 if (commands.back().cout_mode != ostream_mode::term) {
-                    throw parsing_error("ambiguous output redirect");
+                    throw parsing_error("Ambiguous output redirect.");
                 }
                 commands.back().cout_mode = ostream_mode::pipe;
                 commands.emplace_back();
@@ -132,7 +150,7 @@ std::vector<shell_command> parse_command_string(const std::string& str)
 
         case parser_state::need_new_command:
             if (token_type != shell_token_type::text) {
-                throw parsing_error("expecting a command");
+                throw parsing_error("Invalid NULL command");
             }
             commands.back().cmd = token;
             state = parser_state::need_any_token;

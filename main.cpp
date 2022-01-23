@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Yutaka Tsutano
+ * Copyright (c) 2022, Justin Bradley
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,11 +21,13 @@
 #include "command.hpp"
 #include "parser.hpp"
 
+#define MAX_ALLOWED_LINES 25
+
 int main()
 {
     std::string input_line;
 
-    for (;;) {
+    for (int i=0;i<MAX_ALLOWED_LINES;i++) { // Limits the shell to MAX_ALLOWED_LINES
         // Print the prompt.
         std::cout << "osh> " << std::flush;
 

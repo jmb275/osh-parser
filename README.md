@@ -1,42 +1,31 @@
-# Alternative Parser for `osh`
+# Parser for `osh` for CSCE 451/851
 
-PA1 comes with ugly broken parser. This is an alternative implementation you
-can use.
-
-Just mention you've used this library by Yutaka Tsutano instead in your
-README.txt.
+This is a fork of the parser from the former GTA Yutaka Tsutano. It has a few bug fixes and is more tailored for the current version of the programming assignment.
 
 ## 1 Usage
 
-Read [main.cpp](main.cpp) (usage) and [command.hpp](command.hpp) (data
-structure).
+Read [main.cpp](main.cpp) for usage and [command.hpp](command.hpp) for understanding the data structure.
 
 ### 1.1 Compiling & Running on CSE
 
-You can run the following four commands to compile and run on cse.unl.edu:
-
-```sh
-git clone https://github.com/ytsutano/osh-parser.git
-cd osh-parser
-make
-./osh
-```
+A Makefile is provided to make compilation easy. For your programming assignment, this is where you would add any new commands for testing, or copying over the CSE servers, etc.
 
 ### 1.2 Parsing
 
 `parse_command_string()` returns a vector of parsed commands (defined in
-[command.hpp](command.hpp)) from a line of text input from the terminal.
+[command.hpp](command.hpp)) from a line of text input from the terminal. As an example:
 
 ```cpp
 // 1. Get a line from the terminal.
-std::string input_line = "echo hello world | sort | uniq > test.txt";
+std::string input_line;
+std::getline(std::cin, input_line);
+// input into terminal "echo hello world | sort | uniq > test.txt";
 
 // 2. Parse.
 std::vector<shell_command> shell_commands = parse_command_string(input_line);
 ```
 
-This is basically all you need to do for parsing. You just need to execute the
-commands listed in `shell_commands` vector to implement the assignment.
+This is all you need to do to parse the input string. Now you can step through the commands in the `shell_commands` vector to implement the rest of the assignment.
 
 ### 1.3 Printing the Parsed Commands
 
@@ -51,7 +40,7 @@ for (const auto& cmd : shell_commands) {
 }
 ```
 
-The result of parsing `echo hello world | sort | uniq > test.txt`:
+For example, the result of parsing `echo hello world | sort | uniq > test.txt` above would be:
 
 ```text
 -------------------------
@@ -79,47 +68,3 @@ cout_mode: file
 next_mode: always
 -------------------------
 ```
-
-## 2 Hints
-
-### 2.1 Using `execvp()` with C++ Types
-
-Our `shell_command` struct is defined as follows:
-
-```cpp
-struct shell_command {
-    std::string cmd;
-    std::vector<std::string> args;
-
-    // ...
-};
-```
-
-At some point, you need to replace the current process with a new process image
-based on `cmd` and `args` by calling `execvp()`. Because `execvp()` takes
-
-- `const char*` and
-- a null-terminated array of C strings
-
-instead of
-
-- `std::string` and
-- `std::vector<std::string>`,
-
-we need to do a simple conversion. You can use the following helper function to
-pass `cmd` and `args` directly:
-
-```cpp
-int exec(const std::string& cmd, const std::vector<std::string>& args)
-{
-    // Make an ugly C-style args array.
-    std::vector<char*> c_args = {const_cast<char*>(cmd.c_str())};
-    for (const auto& a : args) {
-        c_args.push_back(const_cast<char*>(a.c_str()));
-    }
-    c_args.push_back(nullptr);
-
-    return execvp(cmd.c_str(), c_args.data());
-}
-```
-

@@ -14,14 +14,19 @@
  * PERFORMANCE OF THIS SOFTWARE.
  *
  * Updates:
- * 2022-01-23 Fixes to handle no spaces after semicolons (courtesy of Jaden
+ * 2022-01-23 Justin: Fixes to handle no spaces after semicolons (courtesy of Jaden
  * Goter)
- * 2022-01-27 Improved operator handling. Now no weird whitespace issues
- *     Justin: the original parser didn't properly tokenize when there were no
+ * 2022-01-27 Justin: Improved operator handling. Now no weird whitespace issues
+ *     The original parser didn't properly tokenize when there were no
  *     spaces around the operators. This was fine in the tests because we never
  *     tested for that case, but it was not robust for student testing. To fix
  *     this, we now just put spaces around all operators before the tokenizer.
- * 
+ * 2022-01-28 Justin: Fixes for the case where operators come at the end of the string.
+ *     The previous version did not handle operators coming at the end of the
+ *     command resulting in not handling anomalous input. This didn't manifest
+ *     in the tests because the tests were carefully chosen to not exacerbate
+ *     these points of weakness. Parser should be more robust now and handle
+ *     *most* (if not all) anamolous input.
  */
 
 #include <sstream>
@@ -75,6 +80,11 @@ std::vector<shell_command> parse_command_string(const std::string& str)
 {
     std::vector<shell_command> commands(1);
 
+	// The semicolon can legally be at the end of a command OR have another
+	// command following it. The original code assumed a semicolon *must* be
+	// followed by a command. This boolean helps ensure this correct behavior.
+	bool ending_semicolon = false;
+
     enum class parser_state {
         need_any_token,
         need_new_command,
@@ -90,8 +100,7 @@ std::vector<shell_command> parse_command_string(const std::string& str)
 			(str[i] == '&' && str[i+1] == '&') ||
 			(str[i] == '|' && str[i+1] == '|')){
 				new_str += std::string(" ")+str[i]+str[i+1]+" ";
-				i++;
-				// std::cout << "Found >> && or ||" << std::endl;
+				i++; // consumed 2 chars, so advance the counter
 		}
 		// next look for > < ; |
 		else if(str[i] == ';' ||
@@ -99,7 +108,6 @@ std::vector<shell_command> parse_command_string(const std::string& str)
 				str[i] == '<' ||
 				str[i] == '|') {
 				new_str += std::string(" ")+str[i]+" ";
-				// std::cout << "Found ; > < |" << std::endl;
 		}
 		// no operator, so just add the character
 		else {
@@ -114,7 +122,6 @@ std::vector<shell_command> parse_command_string(const std::string& str)
     std::string token;
     while (iss >> token) {
         auto token_type = get_shell_token_type(token);
-		// std::cout << "Beginning of while state is: " << (int) state << std::endl;
 
         switch (state) {				
         case parser_state::need_any_token:
@@ -166,16 +173,18 @@ std::vector<shell_command> parse_command_string(const std::string& str)
             case shell_token_type::semicolon:
                 commands.emplace_back();
                 state = parser_state::need_new_command;
+				ending_semicolon = true; // ; might not be followed by a command
                 break;
             }
             break;
 
         case parser_state::need_new_command:
-            if (token_type != shell_token_type::text) {
+			if (token_type != shell_token_type::text) {
                 throw parsing_error("Invalid NULL command");
             }
             commands.back().cmd = token;
             state = parser_state::need_any_token;
+			ending_semicolon = false; // change this back to false if ; isn't at the end
             break;
 
         case parser_state::need_in_path:
@@ -187,7 +196,6 @@ std::vector<shell_command> parse_command_string(const std::string& str)
             break;
 
         case parser_state::need_out_path:
-				// std::cout << "in need_out_path" << std::endl;
 				
             if (token_type != shell_token_type::text) {
                 throw parsing_error("Expecting an output path");
@@ -196,12 +204,32 @@ std::vector<shell_command> parse_command_string(const std::string& str)
             state = parser_state::need_any_token;
             break;
         }
-		// int s = (int) state;
-		// std::cout << "End of while state is: " << s << std::endl;
     }
 
-    if (commands.back().cmd == "") {
-        commands.pop_back();
+	// Justin: This is a little hack-ey. Ideally the while loop above would
+	// execute one last time so the state machine could finish. But that's not
+	// easily doable given the architecture. So I just execute the state switch
+	// one last time for the states that could throw an error.
+	// switch on the state one last time
+	switch (state) {				
+	case parser_state::need_new_command:
+		if(ending_semicolon == false) // no semicolon at end
+			 throw parsing_error("Invalid NULL command");
+		break;
+
+	case parser_state::need_in_path:
+		throw parsing_error("Expecting an input path");
+		break;
+
+	case parser_state::need_out_path:
+		throw parsing_error("Expecting an output path");
+		break;
+	default: // do nothing
+		break;
+	}
+
+	if (commands.back().cmd == "") {
+			commands.pop_back();
     }
 
     return commands;

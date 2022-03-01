@@ -180,7 +180,7 @@ std::vector<shell_command> parse_command_string(const std::string& str)
 
         case parser_state::need_new_command:
 			if (token_type != shell_token_type::text) {
-                throw parsing_error("Invalid NULL command");
+                throw parsing_error("Invalid null command.");
             }
             commands.back().cmd = token;
             state = parser_state::need_any_token;
